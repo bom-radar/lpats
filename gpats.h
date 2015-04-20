@@ -82,7 +82,7 @@ namespace gpats
    *    con.connect("myhost", "1234");
    *
    *    // wait for data to arrive
-   *    while (true) {
+   *    while (con.connected()) {
    *      con.poll();
    *    
    *      // process messages from GPATS
