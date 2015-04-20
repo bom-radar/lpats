@@ -17,6 +17,7 @@
 using namespace gpats;
 
 static constexpr size_t wire_size = 24;
+static constexpr message_type no_message = static_cast<message_type>(-1);
 
 static auto verify_checksum(uint8_t const* packet) -> bool
 {
@@ -63,52 +64,45 @@ static auto decode_angle(uint8_t const* packet, size_t i) -> float
 }
 
 /* how our circular read buffer works:
- * - when writing into the first wire_size (24) bytes of the buffer we also replicate
- *   these bytes into the end of the buffer
- * - when the writer reaches the end of the buffer less wire_size it wraps to 0
- * - this means that as a reader, we treat the buffer as if it is wire_size shorter than
- *   it really is.
+ * - when writing into the first wire_size bytes of the buffer we also replicate them at the end
+ * - this means that we treat the buffer as if it is wire_size shorter than it really is
  * - since we know each packet is exactly wire_size long, this allows us to do all our
  *   decoding of a packet without needing to worry about the wrap around point of the buffer
- *   since the packet starting at rpos_ is always in a single contiguous block of memory */
-
-// determine the number of bytes available in the buffer for reading
-inline auto client::read_size() -> size_t
-{
-  return wpos_ < rpos_ ? (buffer_.size() - wire_size) - rpos_ + wpos_ : wpos_ - rpos_;
-}
+ *   since the packet starting at 'rpos' is always in a single contiguous block of memory */
 
 inline auto client::check_cur_type(message_type type) -> void
 {
   if (cur_type_ != type)
   {
-    if (cur_type_ == message_type::none)
+    if (cur_type_ == no_message)
       throw std::runtime_error{"gpats: no message dequeued for decoding"};
     else
       throw std::runtime_error{"gpats: incorrect type passed for decoding"};
   }
 }
 
-client::client(size_t max_buffer_size, size_t initial_buffer_size)
-  : max_buffer_size_{max_buffer_size}
-  , socket_{-1}
+client::client(size_t buffer_size)
+  : socket_{-1}
   , synchronized_{false}
-  , buffer_(initial_buffer_size, 0)
-  , wpos_{0}
-  , rpos_{0}
-  , cur_type_{message_type::none}
+  , buffer_{new uint8_t[buffer_size]}
+  , capacity_{buffer_size - wire_size}
+  , wcount_{0}
+  , rcount_{0}
+  , cur_type_{no_message}
 {
+  if (buffer_size < wire_size * 2)
+    throw std::invalid_argument{"gpats: insufficient client buffer size"};
 }
 
 client::client(client&& rhs) noexcept
-  : max_buffer_size_{rhs.max_buffer_size_}
-  , address_(std::move(rhs.address_))
+  : address_(std::move(rhs.address_))
   , service_(std::move(rhs.service_))
   , socket_{rhs.socket_}
   , synchronized_{rhs.synchronized_}
   , buffer_(std::move(rhs.buffer_))
-  , wpos_{rhs.wpos_}
-  , rpos_{rhs.rpos_}
+  , capacity_{rhs.capacity_}
+  , wcount_{rhs.wcount_}
+  , rcount_{rhs.rcount_}
   , cur_type_{rhs.cur_type_}
   , ascii_{std::move(rhs.ascii_)}
   , ascii_block_count_{rhs.ascii_block_count_}
@@ -119,14 +113,14 @@ client::client(client&& rhs) noexcept
 
 auto client::operator=(client&& rhs) noexcept -> client&
 {
-  max_buffer_size_ = rhs.max_buffer_size_;
   address_ = std::move(rhs.address_);
   service_ = std::move(rhs.service_);
   socket_ = rhs.socket_;
   synchronized_ = rhs.synchronized_;
   buffer_ = std::move(rhs.buffer_);
-  wpos_ = rhs.wpos_;
-  rpos_ = rhs.rpos_;
+  capacity_ = rhs.capacity_;
+  wcount_ = rhs.wcount_;
+  rcount_ = rhs.rcount_;
   cur_type_ = rhs.cur_type_;
   ascii_ = std::move(rhs.ascii_);
   ascii_block_count_ = rhs.ascii_block_count_;
@@ -153,9 +147,9 @@ auto client::connect(std::string address, std::string service) -> void
 
   // reset connection state
   synchronized_ = false;
-  wpos_ = 0;
-  rpos_ = 0;
-  cur_type_ = message_type::none;
+  wcount_ = 0;
+  rcount_ = 0;
+  cur_type_ = no_message;
 
   // lookupt the host
   addrinfo hints, *addr;
@@ -288,52 +282,35 @@ auto client::process_traffic() -> bool
   // read everything we can
   while (true)
   {
-    // see how much contiguous space is left in our buffer
-    auto space = wpos_ < rpos_ ? rpos_ - wpos_ : buffer_.size() - wire_size - wpos_;
+    // if our buffer is full die now
+    if (wcount_ - rcount_ == capacity_)
+      throw std::runtime_error{"gpats: buffer overflow (try increasing buffer size)"};
 
-    printf("space %d wpos %d rpos %d\n", space, wpos_, rpos_);
+    // determine current read and write positions
+    auto rpos = rcount_ % capacity_;
+    auto wpos = wcount_ % capacity_;
 
-    // if our buffer is full, try expanding it a bit
-    if (space == 0)
-    {
-      // determine how much to expand by
-      space = std::min(buffer_.size() * 2, max_buffer_size_) - buffer_.size();
-      if (space == 0)
-        throw std::runtime_error{"gpats: buffer overflow (try increasing max_buffer_size)"};
+    // see how much _contiguous_ space is left in our buffer (may be less than total available write space)
+    auto space = wpos < rpos ? rpos - wpos : capacity_ - wpos;
 
-      printf("expanding! %d to %d\n", buffer_.size(), buffer_.size() + space);
-
-      // insert space at the write position
-      buffer_.insert(buffer_.begin() + wpos_, space, 0);
-
-      // if the read position was after the insertion point, increment it by the same amount
-      if (rpos_ > wpos_)
-        rpos_ += space;
-    }
+    printf("space %d wpos %d rpos %d\n", space, wcount_, rcount_);
 
     // read some data off the wire
-    auto bytes = recv(socket_, &buffer_[wpos_], space, 0);
+    auto bytes = recv(socket_, &buffer_[wcount_], space, 0);
     if (bytes > 0)
     {
       // if we wrote into the start zone of the buffer, make sure we replicate that section at the end
-      if (wpos_ < wire_size)
+      if (wpos < wire_size)
       {
-        for (size_t i = 0; i < wire_size; ++i)
-          buffer_[buffer_.size() - 1 - wire_size] = buffer_[i];
+        for (size_t i = wpos; i < wpos + bytes; ++i)
+          buffer_[capacity_ + i] = buffer_[i];
       }
 
       // advance our write position
-      wpos_ += bytes;
+      wcount_ += bytes;
 
-      printf("read %d new wpos %d bsnegwire %d\n", bytes, wpos_, buffer_.size() - wire_size);
-
-      // if we reached the end of the buffer, wrap around our write cursor
-      // BUG BUG - something not right with the wrap around when rpos == 0
-      // see wikipedia - empty/full ambiguity resolutions
-      if (wpos_ == buffer_.size() - wire_size)
-        wpos_ = 0;
-
-      return true;
+      // if we read as much as we asked for there may be more still waiting so return true
+      return bytes == space;
     }
     else if (bytes < 0)
     {
@@ -374,22 +351,25 @@ auto client::synchronized() const -> bool
   return synchronized_;
 }
 
-auto client::dequeue() -> message_type
+auto client::dequeue(message_type& type) -> bool
 {
   // move along to the next packet in the read buffer if needed
-  if (cur_type_ != message_type::none)
-    rpos_ = (rpos_ + wire_size) % (buffer_.size() - wire_size);
+  if (cur_type_ != no_message)
+    rcount_ += wire_size;
 
   // reset our current type
-  cur_type_ = message_type::none;
+  cur_type_ = no_message;
 
   // while there is enough data for a whole packet
-  while (read_size() >= wire_size)
+  while (wcount_ - rcount_ >= wire_size)
   {
+    // calculate current read position
+    auto rpos = rcount_ % capacity_;
+
     // if we pass the checksum return the message type code
-    if ((synchronized_ = verify_checksum(&buffer_[rpos_])))
+    if ((synchronized_ = verify_checksum(&buffer_[rpos])))
     {
-      switch (buffer_[rpos_] & 0x0f)
+      switch (buffer_[rpos] & 0x0f)
       {
       case 0x00:
       case 0x03:
@@ -408,36 +388,37 @@ auto client::dequeue() -> message_type
         // read the header, if message is not yet recurse to the next packet
         cur_type_ = message_type::ascii;
         if (!handle_ascii_header())
-          dequeue();
+          return dequeue(type);
         break;
 
       case 0x0b:
         // read the header, if message is not yet recurse to the next packet
         cur_type_ = message_type::ascii;
         if (!handle_ascii_body())
-          dequeue();
+          return dequeue(type);
         break;
 
       default:
         // unknown or unsupported packet type, proceed straight to the next packet
-        dequeue();
-        break;
+        return dequeue(type);
       }
 
-      return cur_type_;
+      type = cur_type_;
+      return true;
     }
 
+    // failed the checksum, so we are not synchronized... 
     // move along a character and try again (if there's enough data)
-    ++rpos_;
+    ++rcount_;
   }
 
-  return cur_type_;
+  return false;
 }
 
 auto client::decode(stroke& msg) -> void
 {
   check_cur_type(message_type::stroke);
-  auto const data = &buffer_[rpos_];
+  auto const data = &buffer_[rcount_ % capacity_];
 
   msg.network_id = decode_network(data);
   std::tie(msg.time, msg.time_milliseconds) = decode_time(data);
@@ -454,7 +435,7 @@ auto client::decode(stroke& msg) -> void
 auto client::decode(status& msg) -> void
 {
   check_cur_type(message_type::status);
-  auto const data = &buffer_[rpos_];
+  auto const data = &buffer_[rcount_ % capacity_];
 
   msg.network_id = decode_network(data);
   std::tie(msg.time, msg.time_milliseconds) = decode_time(data);
@@ -471,7 +452,7 @@ auto client::decode(status& msg) -> void
 auto client::decode(timing& msg) -> void
 {
   check_cur_type(message_type::timing);
-  auto const data = &buffer_[rpos_];
+  auto const data = &buffer_[rcount_ % capacity_];
 
   msg.network_id = decode_network(data);
   std::tie(msg.time, msg.time_milliseconds) = decode_time(data);
@@ -485,7 +466,7 @@ auto client::decode(ascii& msg) -> void
 
 auto client::handle_ascii_header() -> bool
 {
-  auto const data = &buffer_[rpos_];
+  auto const data = &buffer_[rcount_ % capacity_];
 
   ascii_.network_id = 0xff;
   std::tie(ascii_.time, ascii_.time_milliseconds) = decode_time(data);
@@ -512,7 +493,7 @@ auto client::handle_ascii_header() -> bool
 
 auto client::handle_ascii_body() -> bool
 {
-  auto const data = &buffer_[rpos_];
+  auto const data = &buffer_[rcount_ % capacity_];
 
   auto block = data[1] - 1;
   if (block >= 0 && block < ascii_block_count_)

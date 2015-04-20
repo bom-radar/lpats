@@ -19,19 +19,60 @@ auto header(gpats::message msg) -> std::string
   return oss.str();
 }
 
+void handle_gpats_messages(gpats::client& con)
+{
+  // decode and print each message that we receive
+  gpats::message_type type;
+  while (con.dequeue(type))
+  {
+    switch (type)
+    {
+    case gpats::message_type::stroke:
+      {
+        gpats::stroke stroke;
+        con.decode(stroke);
+        std::cout
+          << header(stroke)
+          << " stroke"
+          << " lat/lon " << stroke.latitude << " " << stroke.longitude
+          << " amps " << stroke.amps
+          << " gdop " << (int) stroke.gdop
+          << " err " << stroke.error_major_axis << " " << stroke.error_minor_axis << " " << stroke.error_azimuth
+          << std::endl;
+      }
+      break;
+    case gpats::message_type::status:
+      {
+        gpats::status status;
+        con.decode(status);
+        std::cout << header(status) << " status network " << status.name << std::endl;
+      }
+      break;
+    case gpats::message_type::timing:
+      {
+        gpats::timing timing;
+        con.decode(timing);
+        std::cout << header(timing) << " timing" << std::endl;
+      }
+      break;
+    case gpats::message_type::ascii:
+      {
+        gpats::ascii ascii;
+        con.decode(ascii);
+        std::cout << header(ascii) << " ascii content=" << ascii.content << std::endl;
+      }
+      break;
+    }
+  }
+}
+
 int main(int argc, char const* argv[])
 {
   try
   {
     // connect to GPATS
-    gpats::client con{256, 128};
+    gpats::client con{256};
     con.connect("comms.bom.gov.au", "30039");
-
-    // one of each message type
-    gpats::stroke stroke;
-    gpats::status status;
-    gpats::timing timing;
-    gpats::ascii ascii;
 
     // loop forever as long as the connection stays open
     while (con.connected())
@@ -39,44 +80,12 @@ int main(int argc, char const* argv[])
       // wait for messages to arrive
       con.poll();
 
-      // process received messages until we run out
+      // process socket traffic and handle messages until socket runs dry
       while (con.process_traffic())
-      {
-        std::cout << "continue" << std::endl;
-        continue;
-        // decode and print each message that we receive
-        while (true)
-        {
-          switch (con.dequeue())
-          {
-          case gpats::message_type::none:
-            break;
-          case gpats::message_type::stroke:
-            con.decode(stroke);
-            std::cout
-              << header(stroke)
-              << " stroke"
-              << " lat/lon " << stroke.latitude << " " << stroke.longitude
-              << " amps " << stroke.amps
-              << " gdop " << (int) stroke.gdop
-              << " err " << stroke.error_major_axis << " " << stroke.error_minor_axis << " " << stroke.error_azimuth
-              << std::endl;
-            continue;
-          case gpats::message_type::status:
-            std::cout << header(status) << " status network " << status.name << std::endl;
-            continue;
-          case gpats::message_type::timing:
-            std::cout << header(stroke) << " timing" << std::endl;
-            continue;
-          case gpats::message_type::ascii:
-            std::cout << header(ascii) << " ascii content=" << ascii.content << std::endl;
-            continue;
-          }
+        handle_gpats_messages(con);
 
-          // if we get here the type was 'none', so break out of the dequeue loop
-          break;
-        }
-      }
+      // handle remaining messages and return to polling
+      handle_gpats_messages(con);
     }
   }
   catch (std::exception& err)

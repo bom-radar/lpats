@@ -2,16 +2,15 @@
 
 #include <bitset>
 #include <cstdint>
+#include <memory>
 #include <string>
-#include <vector>
 
 namespace gpats
 {
   /// Available GPATS message types
   enum class message_type
   {
-      none      ///< no message received
-    , stroke    ///< stroke indication
+      stroke    ///< stroke indication
     , status    ///< network status
     , timing    ///< timing message
     , ascii     ///< ascii message
@@ -64,8 +63,8 @@ namespace gpats
   {
   public:
     /// Construct a new GPATS connection
-    /** By default the buffer is allocated to hold 128 packets and will expand out to hold at most 1024 packets. */
-    client(size_t max_buffer_size = 24576, size_t initial_buffer_size = 3072);
+    /** By default the buffer is sized to hold 340 GPATS packets, which is just under 8kB. */
+    client(size_t buffer_size = 8184);
 
     client(client const&) = delete;
     client(client&& rhs) noexcept;
@@ -126,7 +125,7 @@ namespace gpats
      *  Each time dequeue is called the stream position is advanced to the next message regardless of whether
      *  the decode function has been called for the current message.  This means that there is no need to decode
      *  messages about which you are not interested. */
-    auto dequeue() -> message_type;
+    auto dequeue(message_type& type) -> bool;
 
     /// Decode the current message into the relevant message structure
     /** If the type of the message argument passed does not match the currently active message (as returned by the
@@ -137,27 +136,28 @@ namespace gpats
     auto decode(ascii& msg) -> void;
 
   private:
-    auto read_size() -> size_t;
+    using buffer = std::unique_ptr<uint8_t[]>;
+
+  private:
     auto check_cur_type(message_type type) -> void;
     auto handle_ascii_header() -> bool;
     auto handle_ascii_body() -> bool;
 
   private:
-    size_t                max_buffer_size_;   // maximum size of receive buffer before triggering overflow
+    std::string       address_;           // remote GPATS hostname or address
+    std::string       service_;           // remote service or port number
+    int               socket_;            // socket handle
+    bool              establish_wait_;    // are we waiting for socket connection to be established?
 
-    std::string           address_;           // remote GPATS hostname or address
-    std::string           service_;           // remote service or port number
-    int                   socket_;            // socket handle
-    bool                  establish_wait_;    // are we waiting for socket connection to be established?
+    bool              synchronized_;      // have we got confirmed stream synchronization?
+    buffer            buffer_;            // ring buffer to store packets off the wire
+    size_t            capacity_;          // total usable buffer capacity
+    size_t            wcount_;            // total bytes that have been written
+    size_t            rcount_;            // total bytes that have been read
+    message_type      cur_type_;          // type of currently dequeued message type
 
-    bool                  synchronized_;      // have we got confirmed stream synchronization?
-    std::vector<uint8_t>  buffer_;            // ring buffer to store packets off the wire
-    size_t                wpos_;              // next available write position
-    size_t                rpos_;              // next filled read position
-    message_type          cur_type_;          // type of currently dequeued message type
-
-    ascii                 ascii_;             // current ascii message being built up in pieces
-    int                   ascii_block_count_; // number of body packets expected
-    std::bitset<255>      ascii_block_flags_; // flags to indicate which body packets have been received
+    ascii             ascii_;             // current ascii message being built up in pieces
+    int               ascii_block_count_; // number of body packets expected
+    std::bitset<255>  ascii_block_flags_; // flags to indicate which body packets have been received
   };
 }
