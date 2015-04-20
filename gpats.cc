@@ -1,4 +1,13 @@
+/*------------------------------------------------------------------------------
+ * GPATS client connection API for C++11
+ *
+ * Copyright (C) 2015 Commonwealth of Australia, Bureau of Meteorology
+ * See COPYING for licensing and warranty details
+ *
+ * Author: Mark Curtis (m.curtis@bom.gov.au)
+ *----------------------------------------------------------------------------*/
 #include "gpats.h"
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -58,6 +67,11 @@ static auto decode_angle(uint8_t const* packet, size_t i) -> float
     + (uint32_t(packet[i+2]) << 16)
     + (uint32_t(packet[i+3]) << 24);
   return static_cast<int32_t>(raw) / 10000000.0f;
+}
+
+auto gpats::release_tag() -> char const*
+{
+  return GPATS_RELEASE_TAG;
 }
 
 /* how our circular read buffer works:

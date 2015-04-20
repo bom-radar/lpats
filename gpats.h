@@ -1,3 +1,11 @@
+/*------------------------------------------------------------------------------
+ * GPATS client connection API for C++11
+ *
+ * Copyright (C) 2015 Commonwealth of Australia, Bureau of Meteorology
+ * See COPYING for licensing and warranty details
+ *
+ * Author: Mark Curtis (m.curtis@bom.gov.au)
+ *----------------------------------------------------------------------------*/
 #pragma once
 
 #include <atomic>
@@ -8,6 +16,9 @@
 
 namespace gpats
 {
+  /// Get the SCM release tag that the library was built from
+  auto release_tag() -> char const*;
+
   /// Available GPATS message types
   enum class message_type
   {
@@ -20,30 +31,30 @@ namespace gpats
   /// Base class for all GPATS messages
   struct message
   {
-    uint8_t     network_id;
-    time_t      time;
-    uint16_t    time_milliseconds;
+    uint8_t     network_id;         ///< identifier for originating network
+    time_t      time;               ///< time of event (ie: stroke time)
+    uint16_t    time_milliseconds;  ///< milliseconds component of time
   };
 
   /// Lightning stroke indication
   struct stroke : message
   {
-    bool        cloud_to_cloud;
-    float       latitude;
-    float       longitude;
-    float       amps;
-    uint8_t     gdop;
-    float       error_major_axis;
-    float       error_minor_axis;
-    float       error_azimuth;
+    bool        cloud_to_cloud;     ///< is this a cloud to cloud stroke?
+    float       latitude;           ///< latitude in degrees north
+    float       longitude;          ///< longitude in degrees east
+    float       amps;               ///< stroke amplitude in amps
+    uint8_t     gdop;               ///< geometric dilution of precision (smaller = more accurate)
+    float       error_major_axis;   ///< major axis length of 95% confidence interval ellipse in meters
+    float       error_minor_axis;   ///< minor axis length of 95% confidence interval ellipse in meters
+    float       error_azimuth;      ///< orientation of major axis of 95% confidence interval ellipse in degrees north
   };
 
   /// Network status
   struct status : message
   {
-    std::string name;       // name of the network
-    char        codes[6];   // status code for each receiver
-    char        status;     // overall network status
+    std::string name;       ///< name of the network
+    char        codes[6];   ///< status code for each receiver
+    char        status;     ///< overall network status
   };
 
   /// Timing synchronization
@@ -53,10 +64,10 @@ namespace gpats
   /// ASCII formatted message
   struct ascii : message
   {
-    uint8_t     code[4];      // message code (internal use)
-    uint8_t     subcode_1[4]; // sub-code block 1 (internal use)
-    uint8_t     subcode_2[4]; // sub-code block 2 (internal use)
-    std::string content;      // content of message (null terminated)
+    uint8_t     code[4];      ///< message code (GPATS internal use)
+    uint8_t     subcode_1[4]; ///< sub-code block 1 (GPATS internal use)
+    uint8_t     subcode_2[4]; ///< sub-code block 2 (GPATS internal use)
+    std::string content;      ///< content of message
   };
 
   /// GPATS client connection manager
@@ -114,11 +125,15 @@ namespace gpats
     client(size_t buffer_size = 4080);
 
     client(client const&) = delete;
+    auto operator=(client const&) -> client& = delete;
+
+    /// Move construct a client connection
     client(client&& rhs) noexcept;
 
-    auto operator=(client const&) -> client& = delete;
+    /// Move assign a client connection
     auto operator=(client&& rhs) noexcept -> client&;
 
+    /// Destroy the client connection and automatically disconnect if needed
     ~client();
 
     /// Connect to a GPATS server

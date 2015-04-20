@@ -1,4 +1,13 @@
+/*------------------------------------------------------------------------------
+ * GPATS client connection API for C++11
+ *
+ * Copyright (C) 2015 Commonwealth of Australia, Bureau of Meteorology
+ * See COPYING for licensing and warranty details
+ *
+ * Author: Mark Curtis (m.curtis@bom.gov.au)
+ *----------------------------------------------------------------------------*/
 #include "gpats.h"
+
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -12,10 +21,10 @@ auto header(gpats::message msg) -> std::string
   if (gmtime_r(&msg.time, &tmm) == nullptr)
     throw std::runtime_error("gmtime_r failed");
 
-  strftime(buf, 128, " %F %T ", &tmm);
-  snprintf(buf2, 32, "%04dms ", msg.time_milliseconds);
+  strftime(buf, 128, "%FT%T", &tmm);
+  snprintf(buf2, 32, ".%04d network ", msg.time_milliseconds);
   std::ostringstream oss;
-  oss << (int) msg.network_id << buf << buf2;
+  oss << buf << buf2 << (int) msg.network_id;
   return oss.str();
 }
 
@@ -33,8 +42,8 @@ void handle_gpats_messages(gpats::client& con)
         con.decode(stroke);
         std::cout
           << header(stroke)
-          << " stroke"
-          << " lat/lon " << stroke.latitude << " " << stroke.longitude
+          << " stroke " << (stroke.cloud_to_cloud ? "c2c" : "gnd")
+          << " location " << stroke.latitude << " " << stroke.longitude
           << " amps " << stroke.amps
           << " gdop " << (int) stroke.gdop
           << " err " << stroke.error_major_axis << " " << stroke.error_minor_axis << " " << stroke.error_azimuth
