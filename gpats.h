@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <bitset>
 #include <cstdint>
 #include <memory>
@@ -59,12 +60,58 @@ namespace gpats
   };
 
   /// GPATS client connection manager
+  /** This class is implemented with the expectation that it may be used in an environment where asynchronous I/O
+   *  is desired.  As such, the most basic use of this class requires calling separate functions for checking
+   *  data availability on the connection, processing connection traffic, dequeuing and decoding messages.
+   *  If synchronous I/O is desired then these calls may simply be chained together one after another.
+   *
+   *  The basic synchronous usage sequence is:
+   *    // create a connection and connect to GPATS server
+   *    client con;
+   *    con.connect("myhost", "1234");
+   *
+   *    // wait for data to arrive
+   *    while (true) {
+   *      con.poll();
+   *    
+   *      // process messages from GPATS
+   *      bool again = true;
+   *      while (again) {
+   *        again = con.process_traffic();
+   *    
+   *        // dequeue each message
+   *        message_type type;
+   *        while (con.dequeue(type)) {
+   *          // decode and handle interesting messages
+   *          if (type == message_type::stroke) {
+   *            stroke msg;
+   *            con.decode(msg);
+   *            ...
+   *          }
+   *        }
+   *      }
+   *    }
+   *
+   * For asynchronous usage, the user should use the pollable_fd(), poll_read() and poll_write() functions to
+   * setup the appropriate multiplexed polling function for their application.
+   *
+   * It is also safe to use this class in a multi-threaded environment where one thread manages the communications
+   * and another thread handles the incoming messages.  In such a setup thread safety is contingent on the following
+   * conditions:
+   *  - Communications is handled by a single thread which calls process_traffic()
+   *  - Message processing is handled by a single thread which calls dequeue() and decode()
+   *  - The connect() function must not be called at the same time as any other member function
+   *
+   * The const member functions may be called safely from any thread at any time.  It is suggested that the poll
+   * functions be called from the communications thread, while the syncrhonized function be called from the 
+   * message handler thread for maximum consistency.
+   */
   class client
   {
   public:
     /// Construct a new GPATS connection
-    /** By default the buffer is sized to hold 340 GPATS packets, which is just under 8kB. */
-    client(size_t buffer_size = 8184);
+    /** By default the buffer is sized to hold 170 GPATS packets, which is just under 4kB. */
+    client(size_t buffer_size = 4080);
 
     client(client const&) = delete;
     client(client&& rhs) noexcept;
@@ -99,7 +146,7 @@ namespace gpats
     /// Wait (block) on the socket until some traffic arrives for processing
     /** The optional timeout parameter may be supplied to force the function to return after a cerain number
      *  of milliseconds.  The default is 5 seconds. */
-    auto poll(int timeout = 5000) -> void;
+    auto poll(int timeout = 5000) const -> void;
 
     /// Process traffic on the socket (may cause new messages to be available for dequeue)
     /** This function will read from the GPATS connection and queue any available messages in a buffer.  The
@@ -121,7 +168,7 @@ namespace gpats
     auto synchronized() const -> bool;
 
     /// Dequeue the next available message and return its type
-    /** If no message is available, the function returns the special message_type value of 'none'.
+    /** If no message is available, the function returns false.
      *  Each time dequeue is called the stream position is advanced to the next message regardless of whether
      *  the decode function has been called for the current message.  This means that there is no need to decode
      *  messages about which you are not interested. */
@@ -152,8 +199,8 @@ namespace gpats
     bool              synchronized_;      // have we got confirmed stream synchronization?
     buffer            buffer_;            // ring buffer to store packets off the wire
     size_t            capacity_;          // total usable buffer capacity
-    size_t            wcount_;            // total bytes that have been written
-    size_t            rcount_;            // total bytes that have been read
+    std::atomic_uint  wcount_;            // total bytes that have been written (wraps)
+    std::atomic_uint  rcount_;            // total bytes that have been read (wraps)
     message_type      cur_type_;          // type of currently dequeued message type
 
     ascii             ascii_;             // current ascii message being built up in pieces

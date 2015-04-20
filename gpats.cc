@@ -11,9 +11,6 @@
 #include <system_error>
 #include <tuple>
 
-// TEMP
-#include <cstdio>
-
 using namespace gpats;
 
 static constexpr size_t wire_size = 24;
@@ -101,8 +98,8 @@ client::client(client&& rhs) noexcept
   , synchronized_{rhs.synchronized_}
   , buffer_(std::move(rhs.buffer_))
   , capacity_{rhs.capacity_}
-  , wcount_{rhs.wcount_}
-  , rcount_{rhs.rcount_}
+  , wcount_{static_cast<unsigned int>(rhs.wcount_)}
+  , rcount_{static_cast<unsigned int>(rhs.rcount_)}
   , cur_type_{rhs.cur_type_}
   , ascii_{std::move(rhs.ascii_)}
   , ascii_block_count_{rhs.ascii_block_count_}
@@ -119,8 +116,8 @@ auto client::operator=(client&& rhs) noexcept -> client&
   synchronized_ = rhs.synchronized_;
   buffer_ = std::move(rhs.buffer_);
   capacity_ = rhs.capacity_;
-  wcount_ = rhs.wcount_;
-  rcount_ = rhs.rcount_;
+  wcount_ = static_cast<unsigned int>(rhs.wcount_);
+  rcount_ = static_cast<unsigned int>(rhs.rcount_);
   cur_type_ = rhs.cur_type_;
   ascii_ = std::move(rhs.ascii_);
   ascii_block_count_ = rhs.ascii_block_count_;
@@ -238,7 +235,7 @@ auto client::poll_write() const -> bool
   return socket_ != -1 && establish_wait_;
 }
 
-auto client::poll(int timeout) -> void
+auto client::poll(int timeout) const -> void
 {
   if (socket_ == -1)
     throw std::runtime_error{"gpats: attempt to poll while disconnected"};
@@ -293,10 +290,8 @@ auto client::process_traffic() -> bool
     // see how much _contiguous_ space is left in our buffer (may be less than total available write space)
     auto space = wpos < rpos ? rpos - wpos : capacity_ - wpos;
 
-    printf("space %d wpos %d rpos %d\n", space, wcount_, rcount_);
-
     // read some data off the wire
-    auto bytes = recv(socket_, &buffer_[wcount_], space, 0);
+    auto bytes = recv(socket_, &buffer_[wpos], space, 0);
     if (bytes > 0)
     {
       // if we wrote into the start zone of the buffer, make sure we replicate that section at the end
