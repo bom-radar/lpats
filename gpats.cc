@@ -319,7 +319,7 @@ auto client::process_traffic() -> bool
       wcount_ += bytes;
 
       // if we read as much as we asked for there may be more still waiting so return true
-      return bytes == space;
+      return static_cast<size_t>(bytes) == space;
     }
     else if (bytes < 0)
     {
@@ -512,6 +512,6 @@ auto client::handle_ascii_body() -> bool
   }
 
   // if we've received all the blocks return true to allow decoding by the user
-  return ascii_block_flags_.count() == ascii_block_count_;
+  return ascii_block_flags_.count() == static_cast<size_t>(ascii_block_count_);
 }
 
