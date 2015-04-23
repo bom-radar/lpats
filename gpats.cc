@@ -94,12 +94,14 @@ inline auto client::check_cur_type(message_type type) -> void
 
 client::client(size_t buffer_size)
   : socket_{-1}
+  , establish_wait_{false}
   , synchronized_{false}
   , buffer_{new uint8_t[buffer_size]}
   , capacity_{buffer_size - wire_size}
   , wcount_{0}
   , rcount_{0}
   , cur_type_{no_message}
+  , ascii_block_count_{0}
 {
   if (buffer_size < wire_size * 2)
     throw std::invalid_argument{"gpats: insufficient client buffer size"};
@@ -109,6 +111,7 @@ client::client(client&& rhs) noexcept
   : address_(std::move(rhs.address_))
   , service_(std::move(rhs.service_))
   , socket_{rhs.socket_}
+  , establish_wait_{rhs.establish_wait_}
   , synchronized_{rhs.synchronized_}
   , buffer_(std::move(rhs.buffer_))
   , capacity_{rhs.capacity_}
@@ -127,6 +130,7 @@ auto client::operator=(client&& rhs) noexcept -> client&
   address_ = std::move(rhs.address_);
   service_ = std::move(rhs.service_);
   socket_ = rhs.socket_;
+  establish_wait_ = rhs.establish_wait_;
   synchronized_ = rhs.synchronized_;
   buffer_ = std::move(rhs.buffer_);
   capacity_ = rhs.capacity_;

@@ -12,7 +12,7 @@ cmake_minimum_required(VERSION 2.8)
 #  - patch -> update when no-relink is required (ie: self-contained inside .so)
 set(GPATS_VERSION_MAJOR 1)
 set(GPATS_VERSION_MINOR 0)
-set(GPATS_VERSION_PATCH 1)
+set(GPATS_VERSION_PATCH 2)
 set(GPATS_VERSION "${GPATS_VERSION_MAJOR}.${GPATS_VERSION_MINOR}.${GPATS_VERSION_PATCH}")
 
 # default to a release build (must be before project())
