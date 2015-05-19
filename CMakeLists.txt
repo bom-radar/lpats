@@ -26,15 +26,31 @@ set(CMAKE_BUILD_TYPE ${DEF_BUILD_TYPE} CACHE STRING "Build type: <none>|Debug|Re
 # initialize our project
 project(gpats)
 
-# customizable install locations
-set(INSTALL_LIB_DIR lib CACHE PATH "Installation directory for libraries")
-set(INSTALL_INCLUDE_DIR include CACHE PATH "Installation directory for header files")
+# default locations based on system configuration
+get_property(LIB64 GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS)
+if (LIB64)
+  set(DEF_INSTALL_LIB_DIR lib64)
+else()
+  set(DEF_INSTALL_LIB_DIR lib)
+endif()
 if (WIN32 AND NOT CYGWIN)
   set(DEF_INSTALL_CMAKE_DIR cmake)
 else()
-  set(DEF_INSTALL_CMAKE_DIR lib/cmake/gpats)
+  set(DEF_INSTALL_CMAKE_DIR ${DEF_INSTALL_LIB_DIR}/cmake/gpats)
 endif()
+
+# customizable install locations
+set(INSTALL_LIB_DIR ${DEF_INSTALL_LIB_DIR} CACHE PATH "Installation directory for libraries")
+set(INSTALL_INCLUDE_DIR include CACHE PATH "Installation directory for header files")
 set(INSTALL_CMAKE_DIR ${DEF_INSTALL_CMAKE_DIR} CACHE PATH "Installation directory for CMake files")
+
+# convert relative paths to absolute
+foreach(p LIB INCLUDE CMAKE)
+  set(var INSTALL_${p}_DIR)
+  if (NOT IS_ABSOLUTE "${${var}}")
+    set(${var} "${CMAKE_INSTALL_PREFIX}/${${var}}")
+  endif()
+endforeach()
 
 # extract sourcee tree version information from git
 find_package(Git)
@@ -49,14 +65,6 @@ if(NOT DEFINED GPATS_RELEASE_TAG OR "${GPATS_RELEASE_TAG}" STREQUAL "")
   set(GPATS_RELEASE_TAG "unknown-version")
 endif()
 add_definitions("-DGPATS_RELEASE_TAG=\"${GPATS_RELEASE_TAG}\"")
-
-# convert relative paths to absolute
-foreach(p LIB INCLUDE CMAKE)
-  set(var INSTALL_${p}_DIR)
-  if (NOT IS_ABSOLUTE "${${var}}")
-    set(${var} "${CMAKE_INSTALL_PREFIX}/${${var}}")
-  endif()
-endforeach()
 
 # ensure C++11 support is turned on
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
@@ -85,26 +93,15 @@ set_target_properties(demo PROPERTIES EXCLUDE_FROM_ALL 1)
 
 # boilerplate to generate our config and version cmake files
 
-# add all targets to build-tree export set
-export(TARGETS gpats FILE "${PROJECT_BINARY_DIR}/gpats-targets.cmake")
-
-# export package for use from build-tree
-export(PACKAGE gpats)
-
 # create config files
 file(RELATIVE_PATH REL_INCLUDE_DIR "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
-# ... for build tree
-set(CONF_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
-configure_file(gpats-config.cmake.in "${PROJECT_BINARY_DIR}/gpats-config.cmake" @ONLY)
-# ... for install tree
 set(CONF_INCLUDE_DIRS "\${RAINUTIL_CMAKE_DIR}/${REL_INCLUDE_DIR}")
-configure_file(gpats-config.cmake.in "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/gpats-config.cmake" @ONLY)
-# ... for both
+configure_file(gpats-config.cmake.in "${PROJECT_BINARY_DIR}/gpats-config.cmake" @ONLY)
 configure_file(gpats-config-version.cmake.in "${PROJECT_BINARY_DIR}/gpats-config-version.cmake" @ONLY)
 
 # install the config files
 install(FILES
-  "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/gpats-config.cmake"
+  "${PROJECT_BINARY_DIR}/gpats-config.cmake"
   "${PROJECT_BINARY_DIR}/gpats-config-version.cmake"
   DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
 
