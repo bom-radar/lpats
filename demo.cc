@@ -11,6 +11,7 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <cstring>
 #include <ctime>
 
 auto header(gpats::message msg) -> std::string
@@ -77,6 +78,14 @@ void handle_gpats_messages(gpats::client& con)
 
 int main(int argc, char const* argv[])
 {
+  if (   argc == 2
+      && (   strcmp(argv[1], "-v") == 0
+          || strcmp(argv[1], "--version") == 0))
+  {
+    std::cout << "GPATS client library demo\nVersion: " << gpats::release_tag() << std::endl;
+    return EXIT_SUCCESS;
+  }
+
   try
   {
     // connect to GPATS
