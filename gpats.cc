@@ -315,7 +315,8 @@ auto client::process_traffic() -> bool
       // if we wrote into the start zone of the buffer, make sure we replicate that section at the end
       if (wpos < wire_size)
       {
-        for (size_t i = wpos; i < wpos + bytes; ++i)
+        auto till = std::min(wpos + bytes, wire_size);
+        for (size_t i = wpos; i < till; ++i)
           buffer_[capacity_ + i] = buffer_[i];
       }
 
