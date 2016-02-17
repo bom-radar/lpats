@@ -1,12 +1,22 @@
 /*------------------------------------------------------------------------------
- * GPATS client connection API for C++11
+ * LPATS Protocol Support Library
  *
- * Copyright (C) 2015 Commonwealth of Australia, Bureau of Meteorology
- * See COPYING for licensing and warranty details
+ * Copyright 2016 Commonwealth of Australia, Bureau of Meteorology
  *
- * Author: Mark Curtis (m.curtis@bom.gov.au)
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *----------------------------------------------------------------------------*/
-#pragma once
+#ifndef LPATS_H
+#define LPATS_H
 
 #include <atomic>
 #include <bitset>
@@ -14,12 +24,12 @@
 #include <memory>
 #include <string>
 
-namespace gpats
+namespace lpats
 {
   /// Get the SCM release tag that the library was built from
   auto release_tag() -> char const*;
 
-  /// Available GPATS message types
+  /// Available LPATS message types
   enum class message_type
   {
       stroke    ///< stroke indication
@@ -28,7 +38,7 @@ namespace gpats
     , ascii     ///< ascii message
   };
 
-  /// Base class for all GPATS messages
+  /// Base class for all LPATS messages
   struct message
   {
     uint8_t     network_id;         ///< identifier for originating network
@@ -64,20 +74,20 @@ namespace gpats
   /// ASCII formatted message
   struct ascii : message
   {
-    uint8_t     code[4];      ///< message code (GPATS internal use)
-    uint8_t     subcode_1[4]; ///< sub-code block 1 (GPATS internal use)
-    uint8_t     subcode_2[4]; ///< sub-code block 2 (GPATS internal use)
+    uint8_t     code[4];      ///< message code (LPATS internal use)
+    uint8_t     subcode_1[4]; ///< sub-code block 1 (LPATS internal use)
+    uint8_t     subcode_2[4]; ///< sub-code block 2 (LPATS internal use)
     std::string content;      ///< content of message
   };
 
-  /// GPATS client connection manager
+  /// LPATS client connection manager
   /** This class is implemented with the expectation that it may be used in an environment where asynchronous I/O
    *  is desired.  As such, the most basic use of this class requires calling separate functions for checking
    *  data availability on the connection, processing connection traffic, dequeuing and decoding messages.
    *  If synchronous I/O is desired then these calls may simply be chained together one after another.
    *
    *  The basic synchronous usage sequence is:
-   *    // create a connection and connect to GPATS server
+   *    // create a connection and connect to LPATS server
    *    client con;
    *    con.connect("myhost", "1234");
    *
@@ -85,7 +95,7 @@ namespace gpats
    *    while (con.connected()) {
    *      con.poll();
    *    
-   *      // process messages from GPATS
+   *      // process messages from LPATS
    *      bool again = true;
    *      while (again) {
    *        again = con.process_traffic();
@@ -120,8 +130,8 @@ namespace gpats
   class client
   {
   public:
-    /// Construct a new GPATS connection
-    /** By default the buffer is sized to hold 170 GPATS packets, which is just under 4kB. */
+    /// Construct a new LPATS connection
+    /** By default the buffer is sized to hold 170 LPATS packets, which is just under 4kB. */
     client(size_t buffer_size = 4080);
 
     client(client const&) = delete;
@@ -136,10 +146,10 @@ namespace gpats
     /// Destroy the client connection and automatically disconnect if needed
     ~client();
 
-    /// Connect to a GPATS server
+    /// Connect to a LPATS server
     auto connect(std::string address, std::string service) -> void;
 
-    /// Disconnect from the GPATS server
+    /// Disconnect from the LPATS server
     auto disconnect() -> void;
 
     /// Return true if a connection to the server is currently active
@@ -164,7 +174,7 @@ namespace gpats
     auto poll(int timeout = 5000) const -> void;
 
     /// Process traffic on the socket (may cause new messages to be available for dequeue)
-    /** This function will read from the GPATS connection and queue any available messages in a buffer.  The
+    /** This function will read from the LPATS connection and queue any available messages in a buffer.  The
      *  messages may subsequently be retrieved by calling deqeue (and decode if desired) repeatedly until
      *  dequeue returns message_type::none.
      *
@@ -173,10 +183,10 @@ namespace gpats
      *  traffic on this socket, or allow entry to a multiplexed wait (such as pselect). */
     auto process_traffic() -> bool;
 
-    /// Get the hostname or address of the remote GPATS server
+    /// Get the hostname or address of the remote LPATS server
     auto address() const -> std::string const&;
 
-    /// Get the service or port name for the GPATS connection
+    /// Get the service or port name for the LPATS connection
     auto service() const -> std::string const&;
 
     /// Is the stream successfully synchronized?
@@ -206,7 +216,7 @@ namespace gpats
     auto handle_ascii_body() -> bool;
 
   private:
-    std::string       address_;           // remote GPATS hostname or address
+    std::string       address_;           // remote LPATS hostname or address
     std::string       service_;           // remote service or port number
     int               socket_;            // socket handle
     bool              establish_wait_;    // are we waiting for socket connection to be established?
@@ -223,3 +233,4 @@ namespace gpats
     std::bitset<255>  ascii_block_flags_; // flags to indicate which body packets have been received
   };
 }
+#endif

@@ -1,12 +1,21 @@
 /*------------------------------------------------------------------------------
- * GPATS client connection API for C++11
+ * LPATS Protocol Support Library
  *
- * Copyright (C) 2015 Commonwealth of Australia, Bureau of Meteorology
- * See COPYING for licensing and warranty details
+ * Copyright 2016 Commonwealth of Australia, Bureau of Meteorology
  *
- * Author: Mark Curtis (m.curtis@bom.gov.au)
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *----------------------------------------------------------------------------*/
-#include "gpats.h"
+#include "lpats.h"
 
 #include <iostream>
 #include <sstream>
@@ -14,7 +23,7 @@
 #include <cstring>
 #include <ctime>
 
-auto header(gpats::message msg) -> std::string
+auto header(lpats::message msg) -> std::string
 {
   char buf[128], buf2[32];
 
@@ -29,17 +38,17 @@ auto header(gpats::message msg) -> std::string
   return oss.str();
 }
 
-void handle_gpats_messages(gpats::client& con)
+void handle_lpats_messages(lpats::client& con)
 {
   // decode and print each message that we receive
-  gpats::message_type type;
+  lpats::message_type type;
   while (con.dequeue(type))
   {
     switch (type)
     {
-    case gpats::message_type::stroke:
+    case lpats::message_type::stroke:
       {
-        gpats::stroke stroke;
+        lpats::stroke stroke;
         con.decode(stroke);
         std::cout
           << header(stroke)
@@ -51,23 +60,23 @@ void handle_gpats_messages(gpats::client& con)
           << std::endl;
       }
       break;
-    case gpats::message_type::status:
+    case lpats::message_type::status:
       {
-        gpats::status status;
+        lpats::status status;
         con.decode(status);
         std::cout << header(status) << " status network " << status.name << std::endl;
       }
       break;
-    case gpats::message_type::timing:
+    case lpats::message_type::timing:
       {
-        gpats::timing timing;
+        lpats::timing timing;
         con.decode(timing);
         std::cout << header(timing) << " timing" << std::endl;
       }
       break;
-    case gpats::message_type::ascii:
+    case lpats::message_type::ascii:
       {
-        gpats::ascii ascii;
+        lpats::ascii ascii;
         con.decode(ascii);
         std::cout << header(ascii) << " ascii content=" << ascii.content << std::endl;
       }
@@ -82,14 +91,14 @@ int main(int argc, char const* argv[])
       && (   strcmp(argv[1], "-v") == 0
           || strcmp(argv[1], "--version") == 0))
   {
-    std::cout << "GPATS client library demo\nVersion: " << gpats::release_tag() << std::endl;
+    std::cout << "LPATS Protocol Support Library Demo\nVersion: " << lpats::release_tag() << std::endl;
     return EXIT_SUCCESS;
   }
 
   try
   {
-    // connect to GPATS
-    gpats::client con{256};
+    // connect to LPATS
+    lpats::client con{256};
     con.connect("comms.bom.gov.au", "30039");
 
     // loop forever as long as the connection stays open
@@ -100,10 +109,10 @@ int main(int argc, char const* argv[])
 
       // process socket traffic and handle messages until socket runs dry
       while (con.process_traffic())
-        handle_gpats_messages(con);
+        handle_lpats_messages(con);
 
       // handle remaining messages and return to polling
-      handle_gpats_messages(con);
+      handle_lpats_messages(con);
     }
   }
   catch (std::exception& err)

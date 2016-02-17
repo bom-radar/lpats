@@ -1,12 +1,21 @@
 /*------------------------------------------------------------------------------
- * GPATS client connection API for C++11
+ * LPATS Protocol Support Library
  *
- * Copyright (C) 2015 Commonwealth of Australia, Bureau of Meteorology
- * See COPYING for licensing and warranty details
+ * Copyright 2016 Commonwealth of Australia, Bureau of Meteorology
  *
- * Author: Mark Curtis (m.curtis@bom.gov.au)
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *----------------------------------------------------------------------------*/
-#include "gpats.h"
+#include "lpats.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -20,7 +29,7 @@
 #include <system_error>
 #include <tuple>
 
-using namespace gpats;
+using namespace lpats;
 
 static constexpr size_t wire_size = 24;
 static constexpr message_type no_message = static_cast<message_type>(-1);
@@ -69,9 +78,9 @@ static auto decode_angle(uint8_t const* packet, size_t i) -> float
   return static_cast<int32_t>(raw) / 10000000.0f;
 }
 
-auto gpats::release_tag() -> char const*
+auto lpats::release_tag() -> char const*
 {
-  return GPATS_RELEASE_TAG;
+  return LPATS_RELEASE_TAG;
 }
 
 /* how our circular read buffer works:
@@ -86,9 +95,9 @@ inline auto client::check_cur_type(message_type type) -> void
   if (cur_type_ != type)
   {
     if (cur_type_ == no_message)
-      throw std::runtime_error{"gpats: no message dequeued for decoding"};
+      throw std::runtime_error{"lpats: no message dequeued for decoding"};
     else
-      throw std::runtime_error{"gpats: incorrect type passed for decoding"};
+      throw std::runtime_error{"lpats: incorrect type passed for decoding"};
   }
 }
 
@@ -104,7 +113,7 @@ client::client(size_t buffer_size)
   , ascii_block_count_{0}
 {
   if (buffer_size < wire_size * 2)
-    throw std::invalid_argument{"gpats: insufficient client buffer size"};
+    throw std::invalid_argument{"lpats: insufficient client buffer size"};
 }
 
 client::client(client&& rhs) noexcept
@@ -154,7 +163,7 @@ client::~client()
 auto client::connect(std::string address, std::string service) -> void
 {
   if (socket_ != -1)
-    throw std::runtime_error{"gpats: connect called while already connected"};
+    throw std::runtime_error{"lpats: connect called while already connected"};
 
   // store connection details
   address_ = std::move(address);
@@ -174,7 +183,7 @@ auto client::connect(std::string address, std::string service) -> void
   hints.ai_socktype = SOCK_STREAM;
   int ret = getaddrinfo(address_.c_str(), service_.c_str(), &hints, &addr);
   if (ret != 0 || addr == nullptr)
-    throw std::runtime_error{"gpats: unable to resolve server address"};
+    throw std::runtime_error{"lpats: unable to resolve server address"};
 
   // TODO - loop through all addresses?
   if (addr->ai_next)
@@ -187,7 +196,7 @@ auto client::connect(std::string address, std::string service) -> void
   if (socket_ == -1)
   {
     freeaddrinfo(addr);
-    throw std::system_error{errno, std::system_category(), "gpats: socket creation failed"};
+    throw std::system_error{errno, std::system_category(), "lpats: socket creation failed"};
   }
 
   // set non-blocking I/O
@@ -196,13 +205,13 @@ auto client::connect(std::string address, std::string service) -> void
   {
     disconnect();
     freeaddrinfo(addr);
-    throw std::system_error{errno, std::system_category(), "gpats: failed to read socket flags"};
+    throw std::system_error{errno, std::system_category(), "lpats: failed to read socket flags"};
   }
   if (fcntl(socket_, F_SETFL, flags | O_NONBLOCK) == -1)
   {
     disconnect();
     freeaddrinfo(addr);
-    throw std::system_error{errno, std::system_category(), "gpats: failed to set socket flags"};
+    throw std::system_error{errno, std::system_category(), "lpats: failed to set socket flags"};
   }
 
   // connect to the remote host
@@ -213,7 +222,7 @@ auto client::connect(std::string address, std::string service) -> void
     {
       disconnect();
       freeaddrinfo(addr);
-      throw std::system_error{errno, std::system_category(), "gpats: failed to establish connection"};
+      throw std::system_error{errno, std::system_category(), "lpats: failed to establish connection"};
     }
     establish_wait_ = true;
   }
@@ -256,7 +265,7 @@ auto client::poll_write() const -> bool
 auto client::poll(int timeout) const -> void
 {
   if (socket_ == -1)
-    throw std::runtime_error{"gpats: attempt to poll while disconnected"};
+    throw std::runtime_error{"lpats: attempt to poll while disconnected"};
 
   struct pollfd fds;
   fds.fd = socket_;
@@ -277,7 +286,7 @@ auto client::process_traffic() -> bool
     if (getsockopt(socket_, SOL_SOCKET, SO_ERROR, &res, &len) < 0)
     {
       disconnect();
-      throw std::system_error{errno, std::system_category(), "gpats: getsockopt failure"};
+      throw std::system_error{errno, std::system_category(), "lpats: getsockopt failure"};
     }
 
     // not connected yet?
@@ -288,7 +297,7 @@ auto client::process_traffic() -> bool
     if (res < 0)
     {
       disconnect();
-      throw std::system_error{res, std::system_category(), "gpats: failed to establish connection (async)"};
+      throw std::system_error{res, std::system_category(), "lpats: failed to establish connection (async)"};
     }
 
     establish_wait_ = false;
@@ -299,7 +308,7 @@ auto client::process_traffic() -> bool
   {
     // if our buffer is full die now
     if (wcount_ - rcount_ == capacity_)
-      throw std::runtime_error{"gpats: buffer overflow (try increasing buffer size)"};
+      throw std::runtime_error{"lpats: buffer overflow (try increasing buffer size)"};
 
     // determine current read and write positions
     auto rpos = rcount_ % capacity_;
@@ -339,7 +348,7 @@ auto client::process_traffic() -> bool
       // a real receive error - kill the connection
       auto err = errno;
       disconnect();
-      throw std::system_error{err, std::system_category(), "gpats: recv failure"};
+      throw std::system_error{err, std::system_category(), "lpats: recv failure"};
     }
     else /* if (bytes == 0) */
     {
@@ -519,4 +528,3 @@ auto client::handle_ascii_body() -> bool
   // if we've received all the blocks return true to allow decoding by the user
   return ascii_block_flags_.count() == static_cast<size_t>(ascii_block_count_);
 }
-

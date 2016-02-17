@@ -1,0 +1,9 @@
+# Config file for the lpats package
+# Defines the following variables:
+#  LPATS_INCLUDE_DIRS - include directories for lpats
+#  LPATS_LIBRARIES    - libraries to link against
+
+get_filename_component(LPATS_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+include("${LPATS_CMAKE_DIR}/lpats-targets.cmake")
+set(LPATS_INCLUDE_DIRS "@CONF_INCLUDE_DIRS@")
+set(LPATS_LIBRARIES lpats)

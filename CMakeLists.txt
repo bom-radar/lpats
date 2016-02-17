@@ -1,8 +1,19 @@
 #-------------------------------------------------------------------------------
-# GPATS client connection API
+# LPATS Protocol Support Library
 #
-# Copyright (C) 2015 Commonwealth of Australia, Bureau of Meteorology
-# See COPYING for licensing and warranty details
+# Copyright 2016 Commonwealth of Australia, Bureau of Meteorology
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #-------------------------------------------------------------------------------
 cmake_minimum_required(VERSION 2.8)
 
@@ -10,10 +21,10 @@ cmake_minimum_required(VERSION 2.8)
 #  - major -> update when breaking API
 #  - minor -> update when breaking ABI - users only need to re-link
 #  - patch -> update when no-relink is required (ie: self-contained inside .so)
-set(GPATS_VERSION_MAJOR 1)
-set(GPATS_VERSION_MINOR 0)
-set(GPATS_VERSION_PATCH 2)
-set(GPATS_VERSION "${GPATS_VERSION_MAJOR}.${GPATS_VERSION_MINOR}.${GPATS_VERSION_PATCH}")
+set(LPATS_VERSION_MAJOR 1)
+set(LPATS_VERSION_MINOR 0)
+set(LPATS_VERSION_PATCH 2)
+set(LPATS_VERSION "${LPATS_VERSION_MAJOR}.${LPATS_VERSION_MINOR}.${LPATS_VERSION_PATCH}")
 
 # default to a release build (must be before project())
 if (DEFINED CMAKE_BUILD_TYPE)
@@ -24,7 +35,7 @@ endif()
 set(CMAKE_BUILD_TYPE ${DEF_BUILD_TYPE} CACHE STRING "Build type: <none>|Debug|Release|RelWithDebInfo|MinSizeRel")
 
 # initialize our project
-project(gpats)
+project(lpats)
 
 # default locations based on system configuration
 get_property(LIB64 GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS)
@@ -36,7 +47,7 @@ endif()
 if (WIN32 AND NOT CYGWIN)
   set(DEF_INSTALL_CMAKE_DIR cmake)
 else()
-  set(DEF_INSTALL_CMAKE_DIR ${DEF_INSTALL_LIB_DIR}/cmake/gpats)
+  set(DEF_INSTALL_CMAKE_DIR ${DEF_INSTALL_LIB_DIR}/cmake/lpats)
 endif()
 
 # customizable install locations
@@ -58,13 +69,14 @@ if(GIT_FOUND)
   execute_process(
     COMMAND "${GIT_EXECUTABLE}" describe --dirty
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-    OUTPUT_VARIABLE GPATS_RELEASE_TAG
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    OUTPUT_VARIABLE LPATS_RELEASE_TAG
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET)
 endif()
-if(NOT DEFINED GPATS_RELEASE_TAG OR "${GPATS_RELEASE_TAG}" STREQUAL "")
-  set(GPATS_RELEASE_TAG "unknown-version")
+if(NOT DEFINED LPATS_RELEASE_TAG OR "${LPATS_RELEASE_TAG}" STREQUAL "")
+  set(LPATS_RELEASE_TAG "unknown-version")
 endif()
-add_definitions("-DGPATS_RELEASE_TAG=\"${GPATS_RELEASE_TAG}\"")
+add_definitions("-DLPATS_RELEASE_TAG=\"${LPATS_RELEASE_TAG}\"")
 
 # ensure C++11 support is turned on
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
@@ -73,37 +85,37 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic -Wextra -Wno-unused-parameter")
 
 # build our library
-add_library(gpats SHARED gpats.cc gpats.h)
-set_target_properties(gpats PROPERTIES VERSION "${GPATS_VERSION}")
-set_target_properties(gpats PROPERTIES PUBLIC_HEADER gpats.h)
-install(TARGETS gpats
-  EXPORT gpats-targets
+add_library(lpats SHARED lpats.cc lpats.h)
+set_target_properties(lpats PROPERTIES VERSION "${LPATS_VERSION}")
+set_target_properties(lpats PROPERTIES PUBLIC_HEADER lpats.h)
+install(TARGETS lpats
+  EXPORT lpats-targets
   LIBRARY DESTINATION "${INSTALL_LIB_DIR}" COMPONENT shlib
   PUBLIC_HEADER DESTINATION "${INSTALL_INCLUDE_DIR}"
   COMPONENT dev)
 
 # create pkg-config file
-configure_file(gpats.pc.in "${PROJECT_BINARY_DIR}/gpats.pc" @ONLY)
-install(FILES "${PROJECT_BINARY_DIR}/gpats.pc" DESTINATION "${INSTALL_LIB_DIR}/pkgconfig")
+configure_file(lpats.pc.in "${PROJECT_BINARY_DIR}/lpats.pc" @ONLY)
+install(FILES "${PROJECT_BINARY_DIR}/lpats.pc" DESTINATION "${INSTALL_LIB_DIR}/pkgconfig")
 
 # build our demo application (not in the 'all' target.  type 'make demo' to build)
 add_executable(demo demo.cc)
-target_link_libraries(demo gpats)
+target_link_libraries(demo lpats)
 set_target_properties(demo PROPERTIES EXCLUDE_FROM_ALL 1)
 
 # boilerplate to generate our config and version cmake files
 
 # create config files
 file(RELATIVE_PATH REL_INCLUDE_DIR "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
-set(CONF_INCLUDE_DIRS "\${RAINUTIL_CMAKE_DIR}/${REL_INCLUDE_DIR}")
-configure_file(gpats-config.cmake.in "${PROJECT_BINARY_DIR}/gpats-config.cmake" @ONLY)
-configure_file(gpats-config-version.cmake.in "${PROJECT_BINARY_DIR}/gpats-config-version.cmake" @ONLY)
+set(CONF_INCLUDE_DIRS "\${LPATS_CMAKE_DIR}/${REL_INCLUDE_DIR}")
+configure_file(lpats-config.cmake.in "${PROJECT_BINARY_DIR}/lpats-config.cmake" @ONLY)
+configure_file(lpats-config-version.cmake.in "${PROJECT_BINARY_DIR}/lpats-config-version.cmake" @ONLY)
 
 # install the config files
 install(FILES
-  "${PROJECT_BINARY_DIR}/gpats-config.cmake"
-  "${PROJECT_BINARY_DIR}/gpats-config-version.cmake"
+  "${PROJECT_BINARY_DIR}/lpats-config.cmake"
+  "${PROJECT_BINARY_DIR}/lpats-config-version.cmake"
   DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
 
 # install the export set for use with the install-tree
-install(EXPORT gpats-targets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
+install(EXPORT lpats-targets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
