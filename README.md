@@ -8,20 +8,20 @@ To build and install the library use CMake to generate Makefiles.  For an
 install to the standard locations on a linux system run the following commands
 from the root of the source distribution:
 
-  mkdir build
-  cd build
-  cmake ..
-  make
-  sudo make install
+    mkdir build
+    cd build
+    cmake ..
+    make
+    sudo make install
 
 To install to a non-standard prefix (eg: ${HOME}/local) modify the cmake line
 as such:
 
-  mkdir build
-  cd build
-  cmake .. -DCMAKE_INSTALL_PREFIX=${HOME}/local
-  make
-  sudo make install
+    mkdir build
+    cd build
+    cmake .. -DCMAKE_INSTALL_PREFIX=${HOME}/local
+    make
+    sudo make install
 
 
 ## Building the demo application
@@ -30,9 +30,8 @@ server and print received lightning strike messages to the console.
 
 To build and run this project, from within the 'build' directory above type:
 
-  make demo
-  ./demo
-
+    make demo
+    ./demo
 
 ## Integrating with your project
 To use the library within your project it is necessary to tell your build
