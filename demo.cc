@@ -99,7 +99,7 @@ int main(int argc, char const* argv[])
   {
     // connect to LPATS
     lpats::client con{256};
-    con.connect("comms.bom.gov.au", "30039");
+    con.connect("cmssdev.bom.gov.au", "35100");
 
     // loop forever as long as the connection stays open
     while (con.connected())
