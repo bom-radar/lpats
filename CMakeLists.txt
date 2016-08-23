@@ -37,31 +37,8 @@ set(CMAKE_BUILD_TYPE ${DEF_BUILD_TYPE} CACHE STRING "Build type: <none>|Debug|Re
 # initialize our project
 project(lpats)
 
-# default locations based on system configuration
-get_property(LIB64 GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS)
-if (LIB64)
-  set(DEF_INSTALL_LIB_DIR lib64)
-else()
-  set(DEF_INSTALL_LIB_DIR lib)
-endif()
-if (WIN32 AND NOT CYGWIN)
-  set(DEF_INSTALL_CMAKE_DIR cmake)
-else()
-  set(DEF_INSTALL_CMAKE_DIR ${DEF_INSTALL_LIB_DIR}/cmake/lpats)
-endif()
-
-# customizable install locations
-set(INSTALL_LIB_DIR ${DEF_INSTALL_LIB_DIR} CACHE PATH "Installation directory for libraries")
-set(INSTALL_INCLUDE_DIR include CACHE PATH "Installation directory for header files")
-set(INSTALL_CMAKE_DIR ${DEF_INSTALL_CMAKE_DIR} CACHE PATH "Installation directory for CMake files")
-
-# convert relative paths to absolute
-foreach(p LIB INCLUDE CMAKE)
-  set(var INSTALL_${p}_DIR)
-  if (NOT IS_ABSOLUTE "${${var}}")
-    set(${var} "${CMAKE_INSTALL_PREFIX}/${${var}}")
-  endif()
-endforeach()
+# setup standard install locations
+include(GNUInstallDirs)
 
 # extract sourcee tree version information from git
 find_package(Git)
@@ -92,13 +69,13 @@ set_target_properties(lpats PROPERTIES VERSION "${LPATS_VERSION}")
 set_target_properties(lpats PROPERTIES PUBLIC_HEADER lpats.h)
 install(TARGETS lpats
   EXPORT lpats-targets
-  LIBRARY DESTINATION "${INSTALL_LIB_DIR}" COMPONENT shlib
-  PUBLIC_HEADER DESTINATION "${INSTALL_INCLUDE_DIR}"
+  LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT shlib
+  PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
   COMPONENT dev)
 
 # create pkg-config file
 configure_file(lpats.pc.in "${PROJECT_BINARY_DIR}/lpats.pc" @ONLY)
-install(FILES "${PROJECT_BINARY_DIR}/lpats.pc" DESTINATION "${INSTALL_LIB_DIR}/pkgconfig")
+install(FILES "${PROJECT_BINARY_DIR}/lpats.pc" DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 
 # build our demo application (not in the 'all' target.  type 'make demo' to build)
 add_executable(demo demo.cc)
@@ -108,8 +85,7 @@ set_target_properties(demo PROPERTIES EXCLUDE_FROM_ALL 1)
 # boilerplate to generate our config and version cmake files
 
 # create config files
-file(RELATIVE_PATH REL_INCLUDE_DIR "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
-set(CONF_INCLUDE_DIRS "\${LPATS_CMAKE_DIR}/${REL_INCLUDE_DIR}")
+file(RELATIVE_PATH REL_INCLUDE_DIR "${CMAKE_INSTALL_FULL_LIBDIR}/cmake/lpats" "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
 configure_file(lpats-config.cmake.in "${PROJECT_BINARY_DIR}/lpats-config.cmake" @ONLY)
 configure_file(lpats-config-version.cmake.in "${PROJECT_BINARY_DIR}/lpats-config-version.cmake" @ONLY)
 
@@ -117,7 +93,7 @@ configure_file(lpats-config-version.cmake.in "${PROJECT_BINARY_DIR}/lpats-config
 install(FILES
   "${PROJECT_BINARY_DIR}/lpats-config.cmake"
   "${PROJECT_BINARY_DIR}/lpats-config-version.cmake"
-  DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/lpats" COMPONENT dev)
 
 # install the export set for use with the install-tree
-install(EXPORT lpats-targets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
+install(EXPORT lpats-targets DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/lpats" COMPONENT dev)

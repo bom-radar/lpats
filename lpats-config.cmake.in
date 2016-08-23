@@ -5,5 +5,5 @@
 
 get_filename_component(LPATS_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
 include("${LPATS_CMAKE_DIR}/lpats-targets.cmake")
-set(LPATS_INCLUDE_DIRS "@CONF_INCLUDE_DIRS@")
+set(LPATS_INCLUDE_DIRS "${LPATS_CMAKE_DIR}/@REL_INCLUDE_DIR@")
 set(LPATS_LIBRARIES lpats)
