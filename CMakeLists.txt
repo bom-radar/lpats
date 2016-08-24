@@ -23,7 +23,7 @@ cmake_minimum_required(VERSION 3.1)
 #  - patch -> update when no-relink is required (ie: self-contained inside .so)
 set(LPATS_VERSION_MAJOR 1)
 set(LPATS_VERSION_MINOR 0)
-set(LPATS_VERSION_PATCH 2)
+set(LPATS_VERSION_PATCH 3)
 set(LPATS_VERSION "${LPATS_VERSION_MAJOR}.${LPATS_VERSION_MINOR}.${LPATS_VERSION_PATCH}")
 
 # default to a release build (must be before project())
