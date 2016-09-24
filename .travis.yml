@@ -1,8 +1,14 @@
+# enable the 'trusty beta' VM to access a modern gcc
 dist: trusty
+sudo: required
+
+# setup for C++
 language: c++
 compiler:
   - clang
   - gcc
+
+# the actual build and test process
 script:
   - mkdir build
   - cd build
