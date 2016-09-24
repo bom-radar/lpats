@@ -1,4 +1,7 @@
 # LPATS Protocol Support Library
+
+[![Build Status](https://travis-ci.org/bom-radar/lpats.svg?branch=master)](https://travis-ci.org/bom-radar/lpats)
+
 This library implements the Lightning Position & Tracking System (LPATS) client
 protocol and makes it easy for you to integrate live lightning data into your
 application.
