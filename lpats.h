@@ -216,21 +216,21 @@ namespace lpats
     auto handle_ascii_body() -> bool;
 
   private:
-    std::string       address_;           // remote LPATS hostname or address
-    std::string       service_;           // remote service or port number
-    int               socket_;            // socket handle
-    bool              establish_wait_;    // are we waiting for socket connection to be established?
+    std::string         address_;           // remote LPATS hostname or address
+    std::string         service_;           // remote service or port number
+    int                 socket_;            // socket handle
+    bool                establish_wait_;    // are we waiting for socket connection to be established?
 
-    bool              synchronized_;      // have we got confirmed stream synchronization?
-    buffer            buffer_;            // ring buffer to store packets off the wire
-    size_t            capacity_;          // total usable buffer capacity
-    std::atomic_uint  wcount_;            // total bytes that have been written (wraps)
-    std::atomic_uint  rcount_;            // total bytes that have been read (wraps)
-    message_type      cur_type_;          // type of currently dequeued message type
+    bool                synchronized_;      // have we got confirmed stream synchronization?
+    buffer              buffer_;            // ring buffer to store packets off the wire
+    size_t              capacity_;          // total usable buffer capacity
+    std::atomic_size_t  wcount_;            // total bytes that have been written (wraps)
+    std::atomic_size_t  rcount_;            // total bytes that have been read (wraps)
+    message_type        cur_type_;          // type of currently dequeued message type
 
-    ascii             ascii_;             // current ascii message being built up in pieces
-    int               ascii_block_count_; // number of body packets expected
-    std::bitset<255>  ascii_block_flags_; // flags to indicate which body packets have been received
+    ascii               ascii_;             // current ascii message being built up in pieces
+    int                 ascii_block_count_; // number of body packets expected
+    std::bitset<255>    ascii_block_flags_; // flags to indicate which body packets have been received
   };
 }
 #endif

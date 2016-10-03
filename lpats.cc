@@ -124,8 +124,8 @@ client::client(client&& rhs) noexcept
   , synchronized_{rhs.synchronized_}
   , buffer_(std::move(rhs.buffer_))
   , capacity_{rhs.capacity_}
-  , wcount_{static_cast<unsigned int>(rhs.wcount_)}
-  , rcount_{static_cast<unsigned int>(rhs.rcount_)}
+  , wcount_{rhs.wcount_.load()}
+  , rcount_{rhs.rcount_.load()}
   , cur_type_{rhs.cur_type_}
   , ascii_{std::move(rhs.ascii_)}
   , ascii_block_count_{rhs.ascii_block_count_}
@@ -143,8 +143,8 @@ auto client::operator=(client&& rhs) noexcept -> client&
   synchronized_ = rhs.synchronized_;
   buffer_ = std::move(rhs.buffer_);
   capacity_ = rhs.capacity_;
-  wcount_ = static_cast<unsigned int>(rhs.wcount_);
-  rcount_ = static_cast<unsigned int>(rhs.rcount_);
+  wcount_ = rhs.wcount_.load();
+  rcount_ = rhs.rcount_.load();
   cur_type_ = rhs.cur_type_;
   ascii_ = std::move(rhs.ascii_);
   ascii_block_count_ = rhs.ascii_block_count_;
